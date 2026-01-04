@@ -1,0 +1,82 @@
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# ===============================
+# Packaging / build
+# ===============================
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ===============================
+# IDEs / Editors
+# ===============================
+.idea/
+.vscode/
+*.iml
+
+# ===============================
+# OS files
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Logs / runtime output
+# ===============================
+*.log
+logs/
+out/
+*.jsonl
+
+# ===============================
+# Network / traffic dumps
+# ===============================
+*.pcap
+*.pcapng
+*.cap
+tcpdump*
+
+# ===============================
+# MQTT / Mosquitto
+# ===============================
+mosquitto.conf
+mosquitto.log
+mosquitto.pid
+data/mosquitto/
+
+# ===============================
+# Environment variables
+# ===============================
+.env
+.env.*
+!.env.example
+
+# ===============================
+# Temporary / cache
+# ===============================
+.cache/
+.tmp/
+tmp/
+
+# ===============================
+# Jupyter (if later added)
+# ===============================
+.ipynb_checkpoints/
+
+# ===============================
+# Docker (optional local overrides)
+# ===============================
+docker-compose.override.yml
