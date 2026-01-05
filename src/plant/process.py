@@ -1,5 +1,7 @@
 # process.py
 import math
+import random
+
 from .state import PlantState
 
 
@@ -98,41 +100,138 @@ class PlantProcess:
     # ELECTRICAL
     # ======================================================
 
+    def _calc_total_power_consumption_kw(self) -> float:
+        """
+        Total instantaneous electrical power consumption of the plant (kW).
+        Single source of truth.
+        """
+        s = self.state
+
+        total_kw = 0.0
+
+        # Pumps
+        total_kw += s.in_pump_power_kw
+        total_kw += s.out_pump_power_kw
+
+        # Filter system (auxiliary load)
+        if s.filter_mode in ("FILTER", "BACKWASH"):
+            total_kw += 0.25
+
+        # Control system (PLC, sensors, gateway)
+        total_kw += 0.08  # 80 W
+
+        return total_kw
+
+    def _calc_in_pump_power_kw(self) -> float:
+        s = self.state
+        if s.in_pump_rpm <= 0 or s.in_pump_state != "ON":
+            return 0.0
+
+        rpm_actual = s.in_pump_rpm * (
+                s.in_pump_voltage_v / s.stabilizer_nominal_voltage
+        )
+
+        rpm_ratio = rpm_actual / s.in_pump_rpm_nom
+
+        wear_ratio = s.filter_wear_pct / 100.0
+        wear_multiplier = (1.0 + 0.3333 * (wear_ratio ** 2)) ** 0.5
+
+        power = (
+                s.in_pump_power_nom_kw
+                * (rpm_ratio ** 3)
+                * wear_multiplier
+        )
+
+        return power
+
+    def _calc_out_pump_power_kw(self) -> float:
+        s = self.state
+        if s.out_pump_rpm <= 0 or s.out_pump_state != "ON":
+            return 0.0
+
+        rpm_actual = s.out_pump_rpm * (
+                s.out_pump_voltage_v / s.stabilizer_nominal_voltage
+        )
+
+        rpm_ratio = rpm_actual / s.out_pump_rpm_nom
+
+        power = (
+                s.out_pump_power_nom_kw
+                * (rpm_ratio ** 3)
+        )
+
+        return power
+
+    def _update_grid_voltage(self, dt: float):
+        s = self.state
+
+        # 1. Base voltage (most of the time)
+        target_v = 220.0 + random.uniform(-1.5, 1.5)
+
+        # 2. Rare events
+        p = random.random()
+        if p < 0.01:
+            target_v += random.choice([-30.0, -20.0, 20.0, 30.0])
+        elif p < 0.05:
+            target_v += random.choice([-10.0, -8.0, 8.0, 10.0])
+
+        # 3. Inertia
+        tau = 8.0  # seconds
+        s.stabilizer_input_voltage += (
+                target_v - s.stabilizer_input_voltage
+                                      ) * (dt / tau)
+
+        # 4. Physical limits
+        s.stabilizer_input_voltage = max(
+            0.0,
+            min(s.stabilizer_input_voltage, 260.0)
+        )
+
     def _update_electrical_pre(self, dt: float):
         s = self.state
 
-        if s.grid_voltage_v < self.GRID_V_FAULT_LOW:
-            s.stabilizer_mode = "FAULT"
-            s.stabilizer_vout_v = 0.0
+        # Severe undervoltage → FAULT
+        if s.stabilizer_input_voltage < self.GRID_V_FAULT_LOW:
+            s.stabilizer_state = "FAULT"
+            s.stabilizer_output_voltage = 0.0
             return
 
-        if s.grid_voltage_v > self.GRID_V_BYPASS_HIGH:
-            s.stabilizer_mode = "BYPASS"
-            s.stabilizer_vout_v = max(0.0, s.grid_voltage_v)
+        # Overvoltage → BYPASS
+        if s.stabilizer_input_voltage > self.GRID_V_BYPASS_HIGH:
+            s.stabilizer_state = "BYPASS"
+            s.stabilizer_output_voltage = max(
+                0.0, s.stabilizer_input_voltage
+            )
             return
 
-        s.stabilizer_mode = "NORMAL"
-        s.stabilizer_vout_v = max(0.0, s.stabilizer_target_vout_v)
+        # Normal regulation
+        s.stabilizer_state = "NORMAL"
+        s.stabilizer_output_voltage = s.stabilizer_nominal_voltage
 
     def _update_electrical_post(self, dt: float):
         s = self.state
 
-        filter_power_kw = 0.0
-        if s.in_pump_state == "ON" and s.filter_mode in ("FILTER", "BACKWASH"):
-            filter_power_kw = 0.25
+        # Recalculate pump power
+        s.in_pump_power_kw = self._calc_in_pump_power_kw()
+        s.out_pump_power_kw = self._calc_out_pump_power_kw()
 
-        s.stabilizer_active_power_kw = (
-            (s.in_pump_power_kw if s.in_pump_state == "ON" else 0.0)
-            + (s.out_pump_power_kw if s.out_pump_state == "ON" else 0.0)
-            + filter_power_kw
+        # Total load
+        s.stabilizer_load_kw = self._calc_total_power_consumption_kw()
+
+        # Thermal model
+        T_eq = (
+                s.ambient_temperature_c
+                + self.STAB_K_TEMP_PER_KW * s.stabilizer_load_kw
         )
 
-        T_eq = s.ambient_temperature_c + self.STAB_K_TEMP_PER_KW * s.stabilizer_active_power_kw
-        s.stabilizer_transformer_temp_c += (T_eq - s.stabilizer_transformer_temp_c) * (dt / self.STAB_TAU_S)
+        s.stabilizer_internal_temperature += (
+                                                     T_eq - s.stabilizer_internal_temperature
+                                             ) * (dt / self.STAB_TAU_S)
 
-        if s.stabilizer_transformer_temp_c >= self.STAB_T_FAULT:
-            s.stabilizer_mode = "FAULT"
-            s.stabilizer_vout_v = 0.0
+        # Overtemperature protection
+        if s.stabilizer_internal_temperature >= self.STAB_T_FAULT:
+            s.stabilizer_state = "FAULT"
+            s.stabilizer_output_voltage = 0.0
 
     def _apply_hard_power_interlock(self):
         s = self.state

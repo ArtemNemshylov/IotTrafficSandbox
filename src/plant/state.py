@@ -23,14 +23,21 @@ class PlantState:
     # ======================================================
     # ELECTRICAL SUBSYSTEM
     # ======================================================
-    grid_voltage_v: float = 220.0
+    stabilizer_input_voltage: float = 220.0  # V (180–260)
 
-    stabilizer_target_vout_v: float = 220.0
-    stabilizer_mode: str = "NORMAL"  # NORMAL / BYPASS / FAULT
-    stabilizer_vout_v: float = 220.0
+    # Output to consumers
+    stabilizer_output_voltage: float = 220.0  # V
 
-    stabilizer_transformer_temp_c: float = 35.0
-    stabilizer_active_power_kw: float = 0.0
+    stabilizer_state: str = "NORMAL"  # NORMAL / BYPASS / FAULT
+
+    stabilizer_internal_temperature: float = 40.0  # °C
+
+    stabilizer_load_kw: float = 0.0  # kW
+
+    # Configuration / thresholds
+    stabilizer_nominal_voltage: float = 220.0  # V
+    stabilizer_temp_normal_max: float = 70.0  # °C
+    stabilizer_temp_bypass_max: float = 90.0  # °C
 
     # ======================================================
     # WATER STORAGE (TANK)
@@ -93,15 +100,15 @@ class PlantState:
     in_pump_rpm: float = 0.0
     in_pump_flow_lpm: float = 0.0
     in_pump_pressure_bar: float = 0.0
-    in_pump_power_kw: float = 0.0
+    in_pump_power_kw: float = 1500.0
     in_pump_motor_temp_c: float = 25.0
 
     in_pump_high_rpm_time_s: float = 0.0
     in_pump_cooldown_remaining_s: float = 0.0
 
-    in_pump_rpm_min: float = 900.0
-    in_pump_rpm_max: float = 3600.0
-    in_pump_rpm_nom: float = 3000.0
+    in_pump_rpm_min: float = 1000.0
+    in_pump_rpm_max: float = 4000.0
+    in_pump_rpm_nom: float = 2500.0
     in_pump_flow_nom_lpm: float = 120.0
     in_pump_pressure_nom_bar: float = 2.5
     in_pump_power_nom_kw: float = 1.5
@@ -126,9 +133,9 @@ class PlantState:
     out_pump_high_rpm_time_s: float = 0.0
     out_pump_cooldown_remaining_s: float = 0.0
 
-    out_pump_rpm_min: float = 900.0
-    out_pump_rpm_nom: float = 3000.0
-    out_pump_rpm_max: float = 3960.0  # 3600 * 1.1
+    out_pump_rpm_min: float = 1000.0
+    out_pump_rpm_nom: float = 2500.0
+    out_pump_rpm_max: float = 4000.0  # 3600 * 1.1
     out_pump_flow_nom_lpm: float = 120.0
     out_pump_pressure_nom_bar: float = 2.5
     out_pump_power_nom_kw: float = 1.5
