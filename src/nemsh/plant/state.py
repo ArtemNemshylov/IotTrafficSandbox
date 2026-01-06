@@ -19,15 +19,22 @@ def clamp(x: float, lo: float, hi: float) -> float:
 class EnvironmentState:
     ambient_temperature_c: float = 20.0
 
-# до виправлення
 @dataclass
 class StabilizerState:
-    vin_v: float = 220.0
-    vout_v: float = 220.0
-    mode: StabilizerMode = "NORMAL"
-    active_power_kw: float = 0.0
-    transformer_temp_c: float = 25.0
+    input_voltage: float = 220.0  # V (180–260)
+    output_voltage: float = 220.0  # V
 
+    nominal_voltage: float = 220.0  # V
+
+    mode: StabilizerMode = "NORMAL"
+
+    active_power_kw: float = 0.0
+    transformer_temp: float = 25.0
+    # temp
+    nominal_temp: float = 60.0  # °C
+    normal_max_temp: float = 70.0  # °C
+    bypass_max_temp: float = 90.0  # °C
+    fault_temp: float = 110.0  # °C
 
 @dataclass
 class PumpState:
@@ -42,15 +49,16 @@ class PumpState:
     # Electrical
     voltage_v: float = 220.0
     power_kw: float = 0.0
+    power_nom_kw: float = 1.5
 
     # Hydraulics
     pressure_bar: float = 0.0
     flow_lpm: float = 0.0
 
     # Thermal
-    motor_temp_c: float = 20.0
-    overheat_limit_c: float = 105.0
-    hard_limit_c: float = 110.0
+    motor_temp: float = 20.0 # °C
+    limit_temp: float = 105.0 # °C
+    fault_temp: float = 110.0 # °C
     overheat_seconds: float = 0.0
 
 
@@ -100,3 +108,4 @@ class PlantState:
 
     filter: FilterState = field(default_factory=FilterState)
     tank: TankState = field(default_factory=TankState)
+v = PlantState.stabilizer.bypass_max_temp
