@@ -66,6 +66,11 @@ class PlantProcess:
     def __init__(self, state: PlantState):
         self.state = state
 
+        # Grid quality regime
+        self._grid_regime = "NORMAL"  # NORMAL / DEGRADED / DISTURBANCE
+        self._grid_regime_time_left = 0  # seconds
+        self._grid_target_voltage = state.stabilizer_nominal_voltage
+
     # ======================================================
     # MAIN STEP
     # ======================================================
@@ -164,24 +169,55 @@ class PlantProcess:
 
     def _update_grid_voltage(self, dt: float):
         s = self.state
+        Vnom = s.stabilizer_nominal_voltage
 
-        # 1. Base voltage (most of the time)
-        target_v = 220.0 + random.uniform(-1.5, 1.5)
+        # --------------------------------------------------
+        # 1) Select / update grid regime (rarely)
+        # --------------------------------------------------
+        if self._grid_regime_time_left <= 0:
+            r = random.random()
 
-        # 2. Rare events
-        p = random.random()
-        if p < 0.01:
-            target_v += random.choice([-30.0, -20.0, 20.0, 30.0])
-        elif p < 0.05:
-            target_v += random.choice([-10.0, -8.0, 8.0, 10.0])
+            if r < 0.90:
+                self._grid_regime = "NORMAL"
+                self._grid_regime_time_left = random.randint(60, 300)  # 1–5 min
+            elif r < 0.98:
+                self._grid_regime = "DEGRADED"
+                self._grid_regime_time_left = random.randint(30, 120)  # 30–120 s
+            else:
+                self._grid_regime = "DISTURBANCE"
+                self._grid_regime_time_left = random.randint(3, 12)  # short event
 
-        # 3. Inertia
-        tau = 8.0  # seconds
+            # Pick new target voltage for this regime
+            if self._grid_regime == "NORMAL":
+                dev_pct = random.uniform(0.02, 0.04)
+            elif self._grid_regime == "DEGRADED":
+                dev_pct = random.uniform(0.5, 0.13)
+            else:  # DISTURBANCE
+                dev_pct = random.uniform(0.15, 0.30)
+
+            sign = random.choice([-1.0, 1.0])
+            self._grid_target_voltage = Vnom * (1.0 + sign * dev_pct)
+
+        self._grid_regime_time_left -= dt
+
+        # --------------------------------------------------
+        # 2) Smooth inertia towards target voltage
+        # --------------------------------------------------
+        tau = 6.0 if self._grid_regime != "DISTURBANCE" else 1.5
+
         s.stabilizer_input_voltage += (
-                target_v - s.stabilizer_input_voltage
+                                              self._grid_target_voltage - s.stabilizer_input_voltage
                                       ) * (dt / tau)
 
-        # 4. Physical limits
+        # --------------------------------------------------
+        # 3) Small high-frequency noise (always present)
+        # --------------------------------------------------
+        noise = random.uniform(-0.5, 0.5)
+        s.stabilizer_input_voltage += noise
+
+        # --------------------------------------------------
+        # 4) Physical limits
+        # --------------------------------------------------
         s.stabilizer_input_voltage = max(
             0.0,
             min(s.stabilizer_input_voltage, 260.0)
