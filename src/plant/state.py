@@ -1,89 +1,155 @@
+# state.py
 from dataclasses import dataclass
 
 
 @dataclass
 class PlantState:
     """
-    Centralized state of the technological object (water treatment plant).
-
-    This class contains ONLY state parameters.
-    No physics, no calculations, no networking logic.
-    All behavior is implemented in process.py.
+    Центральний стан водоочисної станції.
+    ТІЛЬКИ дані (state). Уся логіка/фізика/автоматика — в process.py
     """
+
+    # ======================================================
+    # SIM
+    # ======================================================
+    time_seconds: int = 0
+    dt_s_default: float = 1.0
 
     # ======================================================
     # ENVIRONMENT
     # ======================================================
-
-    ambient_temperature: float = 25.0        # °C (cooling baseline)
+    ambient_temperature_c: float = 20.0  # °C
 
     # ======================================================
     # ELECTRICAL SUBSYSTEM
     # ======================================================
+    stabilizer_input_voltage: float = 220.0  # V (180–260)
 
-    # External power grid
-    grid_voltage: float = 220.0              # V (180–240)
+    # Output to consumers
+    stabilizer_output_voltage: float = 220.0  # V
 
-    # Stabilizer (derived)
-    stabilizer_output_voltage: float = 220.0 # V
-    stabilizer_state: str = "NORMAL"         # NORMAL / BYPASS / FAULT
+    stabilizer_state: str = "NORMAL"  # NORMAL / BYPASS / FAULT
 
-    # ======================================================
-    # IN-PUMP (WELL PUMP)
-    # ======================================================
+    stabilizer_internal_temperature: float = 40.0  # °C
 
-    # Control (operator input)
-    in_pump_power_setpoint: float = 70.0     # % (0–100)
-    in_pump_power_actual: float = 70.0       # % (derived, inertial)
+    stabilizer_load_kw: float = 0.0  # kW
 
-    # Nominal characteristics
-    in_pump_nominal_rpm: float = 2900.0      # RPM
-    in_pump_nominal_flow_lpm = 120.0   # LPM
-
-    # Actual / derived values
-    in_pump_rpm: float = 2030.0              # RPM
-    in_pump_flow_lpm: float = 42.0           # LPM
-    in_pump_pressure_bar: float = 4.0        # bar
-    in_pump_motor_temp: float = 45.0         # °C
-    in_pump_power_kw: float = 1.5            # kW
-
-    # ======================================================
-    # FILTRATION UNIT
-    # ======================================================
-
-    filter_state: str = "FILTERING"           # FILTERING / BACKWASH
-    filter_delta_p: float = 0.3               # bar
-    turbidity_out: float = 1.2                # NTU
+    # Configuration / thresholds
+    stabilizer_nominal_voltage: float = 220.0  # V
+    stabilizer_temp_normal_max: float = 70.0  # °C
+    stabilizer_temp_bypass_max: float = 90.0  # °C
 
     # ======================================================
     # WATER STORAGE (TANK)
     # ======================================================
+    tank_capacity_liters: float = 10_000.0
+    tank_level_liters: float = 5_000.0
 
-    tank_capacity_liters: float = 100.0     # L
-    tank_level_liters: float = 5000.0         # L (derived)
-    tank_level_percent: float = 50.0          # % (derived)
+    tank_min_level_pct: float = 6.0                 # <= цього — OUT OFF
+    tank_out_limit_level_pct: float = 20.0          # < цього — OUT обмежуємо
+    tank_in_emergency_level_pct: float = 20.0       # < цього — IN = 100%
+    tank_in_nominal_until_pct: float = 80.0         # ДО цього — IN тримає NOMINAL RPM
+    tank_backwash_start_level_pct: float = 75.0
+    tank_backwash_stop_level_pct: float = 60.0
+    tank_max_level_pct: float = 95.0                # >= цього — IN OFF
 
-    # ======================================================
-    # OUT-PUMP (DISTRIBUTION PUMP)
-    # ======================================================
+    tank_overflow: bool = False
+    tank_level_sensors_state: str = "OK"  # OK / FAULT / TAMPER
+    tank_valves_state: str = "OPEN"
 
-    # Control (operator input)
-    out_pump_power_setpoint: float = 60.0     # % (0–100)
-    out_pump_power_actual: float = 60.0       # % (derived, inertial)
-
-    # Nominal characteristics
-    out_pump_nominal_rpm: float = 2900.0      # RPM
-    out_pump_nominal_flow_lpm: float = 100.0   # LPM
-
-    # Actual / derived values
-    out_pump_rpm: float = 1740.0              # RPM
-    out_pump_flow_lpm: float = 30.0           # LPM
-    out_pump_pressure_bar: float = 3.5        # bar
-    out_pump_motor_temp: float = 42.0         # °C
-    out_pump_power_kw: float = 1.2            # kW
+    tank_in_flow_lpm: float = 0.0
+    tank_out_flow_lpm: float = 0.0
+    tank_level_pct: float = 50.0
+    tank_level_rate_pct_s: float = 0.0
 
     # ======================================================
-    # SIMULATION / SERVICE
+    # WATER QUALITY SOURCE (RAW WATER)
     # ======================================================
+    ntu_in: float = 1.2
+    ph_in: float = 7.2
 
-    time_seconds: int = 0
+    # ======================================================
+    # FILTER SYSTEM
+    # ======================================================
+    filter_mode: str = "FILTER"  # FILTER / BACKWASH / IDLE
+    filter_wear_pct: float = 10.0  # 0..100
+    filter_delta_p_bar: float = 0.15
+    filter_in_pressure_bar: float = 0.0
+    filter_out_pressure_bar: float = 0.0
+
+    ntu_out: float = 0.8
+    ph_out: float = 7.2
+
+    filter_valves_state: str = "OPEN"
+    filter_quality_alarm: bool = False
+
+    filter_backwash_elapsed_s: float = 0.0
+    filter_backwash_max_s: float = 180.0
+
+    # ======================================================
+    # IN PUMP
+    # ======================================================
+    in_pump_cmd_mode: str = "AUTO"  # AUTO / MANUAL
+    in_pump_cmd_state: str = "ON"   # ON / OFF
+    in_pump_cmd_rpm_pct: float = 50.0  # для MANUAL
+
+    in_pump_state: str = "OFF"  # ON / OFF / FAULT
+    in_pump_fault_code: str = ""  # DRY_RUN / OVERHEAT / ...
+
+    in_pump_voltage_v: float = 0.0
+    in_pump_rpm: float = 0.0
+    in_pump_flow_lpm: float = 0.0
+    in_pump_pressure_bar: float = 0.0
+    in_pump_power_kw: float = 1500.0
+    in_pump_motor_temp_c: float = 25.0
+
+    in_pump_high_rpm_time_s: float = 0.0
+    in_pump_cooldown_remaining_s: float = 0.0
+
+    in_pump_rpm_min: float = 1000.0
+    in_pump_rpm_max: float = 4000.0
+    in_pump_rpm_nom: float = 2500.0
+    in_pump_flow_nom_lpm: float = 120.0
+    in_pump_pressure_nom_bar: float = 2.5
+    in_pump_power_nom_kw: float = 1.5
+
+    # ======================================================
+    # OUT PUMP  (max RPM must be +10% vs IN)
+    # ======================================================
+    out_pump_cmd_mode: str = "AUTO"  # AUTO / MANUAL
+    out_pump_cmd_state: str = "ON"   # ON / OFF
+    out_pump_cmd_rpm_pct: float = 50.0
+
+    out_pump_state: str = "OFF"  # ON / OFF / FAULT
+    out_pump_fault_code: str = ""
+
+    out_pump_voltage_v: float = 0.0
+    out_pump_rpm: float = 0.0
+    out_pump_flow_lpm: float = 0.0
+    out_pump_pressure_bar: float = 0.0
+    out_pump_power_kw: float = 0.0
+    out_pump_motor_temp_c: float = 25.0
+
+    out_pump_high_rpm_time_s: float = 0.0
+    out_pump_cooldown_remaining_s: float = 0.0
+
+    out_pump_rpm_min: float = 1000.0
+    out_pump_rpm_nom: float = 2500.0
+    out_pump_rpm_max: float = 4000.0  # 3600 * 1.1
+    out_pump_flow_nom_lpm: float = 120.0
+    out_pump_pressure_nom_bar: float = 2.5
+    out_pump_power_nom_kw: float = 1.5
+
+    # ======================================================
+    # DEMAND (OUTFLOW REQUEST)
+    # ======================================================
+    demand_window_s: int = 3600
+    demand_window_remaining_s: int = 3600
+    out_demand_factor: float = 0.85  # 0.7..1.1
+    out_demand_lpm: float = 0.0
+
+    # ======================================================
+    # LATCHES / INTERLOCKS
+    # ======================================================
+    out_blocked_low_level_filter: bool = False  # latch: level<20 AND wear>=85 => block OUT until wear<=50
+    out_block_reason: str = ""                  # UI/debug
