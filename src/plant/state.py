@@ -30,15 +30,15 @@ class PlantState:
 
     stabilizer_state: str = "NORMAL"  # NORMAL / BYPASS / FAULT
 
-    stabilizer_internal_temperature: float = 40.0  # °C
-
     stabilizer_load_kw: float = 0.0  # kW
 
     # Configuration / thresholds
     stabilizer_nominal_voltage: float = 220.0  # V
-    stabilizer_temp_normal_max: float = 70.0  # °C
-    stabilizer_temp_bypass_max: float = 90.0  # °C
 
+    stabilizer_temp_nominal: float = 60.0 # °C
+    stabilizer_temp_normal_max: float = 70.0 # °C
+    stabilizer_temp_bypass_max: float = 90.0 # °C
+    stabilizer_temp_fault: float = 110.0 # °C
     # ======================================================
     # WATER STORAGE (TANK)
     # ======================================================
