@@ -108,4 +108,3 @@ class PlantState:
 
     filter: FilterState = field(default_factory=FilterState)
     tank: TankState = field(default_factory=TankState)
-v = PlantState.stabilizer.bypass_max_temp

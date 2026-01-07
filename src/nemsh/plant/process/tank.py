@@ -1,4 +1,4 @@
-from src.nemsh.plant.state import PlantState, clamp
+from ..state import PlantState, clamp
 
 class TankProcess:
     def step(self, s: PlantState, dt: float) -> None:

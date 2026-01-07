@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import random
 
-from src.nemsh.plant.state import PlantState, clamp
+from ..state import PlantState, clamp
 
 
 class PumpProcess:
@@ -22,6 +22,42 @@ class PumpProcess:
         # AUTO random rpm_desired each 10s
         self._update_out_random_rpm(s, dt)
         self._step_pump(s, s.out_pump, dt, is_in_pump=False)
+
+    # ================== ELECTRICAL ===================
+    @staticmethod
+    def _calc_in_pump_power_kw(s: PlantState) -> None:
+        if s.in_pump.rpm_actual <= 0 or s.in_pump.state != "ON":
+            s.in_pump.power_kw = 0.0
+
+
+        rpm_ratio = s.in_pump.rpm_actual / s.in_pump.rpm_nom
+
+        wear_ratio = s.filter.wear_pct / 100.0
+        wear_multiplier = (1.0 + 0.3333 * (wear_ratio ** 2)) ** 0.5
+
+        power = (
+                s.in_pump.power_nom_kw
+                * (rpm_ratio ** 3)
+                * wear_multiplier
+        )
+        s.in_pump.power_kw = power
+
+    @staticmethod
+    def _calc_out_pump_power_kw(s: PlantState) -> None:
+        if s.out_pump.rpm_actual <= 0 or s.out_pump.state != "ON":
+            s.out_pump.power_kw = 0.0
+
+
+        rpm_ratio = s.out_pump.rpm_actual / s.out_pump.rpm_nom
+
+        power = (
+                s.out_pump.power_nom_kw
+                * (rpm_ratio ** 3)
+        )
+
+        s.out_pump.power_kw = power
+
+    # =================================================
 
     def _update_out_random_rpm(self, s: PlantState, dt: float) -> None:
         if dt <= 0:
@@ -83,6 +119,9 @@ class PumpProcess:
         self._update_hydraulics(p, s, is_in_pump)
 
         self._update_thermal(p, s, dt)
+
+        self._calc_in_pump_power_kw(s)
+        self._calc_out_pump_power_kw(s)
 
         # hard fault after thermal update
         if float(p.motor_temp) >= float(p.fault_temp):

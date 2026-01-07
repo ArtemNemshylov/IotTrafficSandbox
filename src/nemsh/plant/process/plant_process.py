@@ -1,4 +1,4 @@
-from src.nemsh.plant.state import PlantState
+from ..state import PlantState
 from .stabilizer import StabilizerProcess
 from .pump import PumpProcess
 from .filter import FilterProcess
