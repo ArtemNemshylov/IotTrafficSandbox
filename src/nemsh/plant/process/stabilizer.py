@@ -41,57 +41,50 @@ class StabilizerProcess:
     # GRID (external network)
     # ======================================================
     def _update_grid_voltage(self, s: PlantState, dt: float) -> None:
-        vnom = s.stabilizer.nominal_voltage
+        # =========================
+        # БАЗОВА "ЖИВА" МЕРЕЖА
+        # =========================
 
-        # -------------------------
-        # 1. вибір режиму мережі
-        # -------------------------
+        # 1. якщо нема активної аварії — повільно гуляємо між 210 і 225
         if self._grid_time_left_s <= 0.0:
-            r = random.random()
+            # шанс аварії ~1% на крок
+            if random.random() < 0.01:
+                # аварійна подія
+                self._grid_time_left_s = random.uniform(2.0, 8.0)
 
-            if r < 0.90:
-                self._grid_regime = "NORMAL"
-                self._grid_time_left_s = random.uniform(60.0, 300.0)
-                dev_pct = random.uniform(0.02, 0.04)
-            elif r < 0.98:
-                self._grid_regime = "DEGRADED"
-                self._grid_time_left_s = random.uniform(30.0, 120.0)
-                dev_pct = random.uniform(0.05, 0.13)
-            else:
+                if random.random() < 0.5:
+                    # просадка
+                    self._grid_target_voltage = random.uniform(180.0, 200.0)
+                else:
+                    # перенапруга
+                    self._grid_target_voltage = random.uniform(240.0, 260.0)
+
                 self._grid_regime = "DISTURBANCE"
-                self._grid_time_left_s = random.uniform(3.0, 12.0)
-                dev_pct = random.uniform(0.15, 0.30)
-
-            sign = random.choice([-1.0, 1.0])
-            self._grid_target_voltage = vnom * (1.0 + sign * dev_pct)
+            else:
+                # нормальне постійне коливання
+                self._grid_time_left_s = random.uniform(3.0, 8.0)
+                self._grid_target_voltage = random.uniform(210.0, 225.0)
+                self._grid_regime = "NORMAL"
 
         self._grid_time_left_s -= dt
 
-        # -------------------------
-        # 2. інерція до цілі
-        # -------------------------
-        tau = (
-            self.TAU_DISTURBANCE
-            if self._grid_regime == "DISTURBANCE"
-            else self.TAU_NORMAL
-        )
+        # =========================
+        # ІНЕРЦІЯ
+        # =========================
+        tau = 1.0 if self._grid_regime == "DISTURBANCE" else 5.0
 
         vin = s.stabilizer.input_voltage
         vin += (self._grid_target_voltage - vin) * clamp(dt / tau, 0.0, 1.0)
 
-        # -------------------------
-        # 3. шум
-        # -------------------------
-        vin += random.uniform(-self.NOISE_V, self.NOISE_V)
+        # =========================
+        # ПОСТІЙНИЙ ШУМ
+        # =========================
+        vin += random.uniform(-0.8, 0.8)
 
-        # -------------------------
-        # 4. фізичні межі
-        # -------------------------
-        s.stabilizer.input_voltage = clamp(
-            vin,
-            self.GRID_V_MIN,
-            self.GRID_V_MAX,
-        )
+        # =========================
+        # ФІЗИЧНІ МЕЖІ
+        # =========================
+        s.stabilizer.input_voltage = clamp(vin, 0.0, 280.0)
 
     # ======================================================
     # STABILIZER LOGIC
