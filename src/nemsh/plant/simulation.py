@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .state import PlantState
 from .controller import PlantController
-from .process import PlantProcess
+from .process.plant_process import PlantProcess
 
 
 @dataclass
